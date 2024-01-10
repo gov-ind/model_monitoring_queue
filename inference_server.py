@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 import random
 import sys
@@ -14,9 +15,15 @@ if __name__ == "__main__":
     channel = connection.channel()
     channel.exchange_declare(exchange=exchange_name, exchange_type="direct")
 
-    assert len(sys.argv) > 1, "A model ID must be passed."
+    n_args = len(sys.argv)
+    assert n_args > 1, "A model ID must be passed."
     model_id = sys.argv[1]
-
+    if n_args > 2:
+        client_id = sys.argv[2]
+    else:
+        logging.info("No client ID was passed. Assuming that the model ID is the client ID.")
+        client_id = model_id
+ 
     def make_inferences(start_ix):
         end_ix = start_ix + batch_size
         data = np.ones(batch_size) + np.random.normal(0, 1, batch_size)
@@ -26,11 +33,13 @@ if __name__ == "__main__":
         
         data = pd.DataFrame({
             "feature_1": data,
-            "pred": data > 1
+            "pred": data > 1,
+            "time": datetime.now()
         }, index=range(start_ix, end_ix))
         payload = dumps({
             "model_id": model_id,
-            "data": data.to_json()
+            "client_id": client_id,
+            "data": data.to_json(date_format="iso")
         })
 
         channel.basic_publish(
@@ -38,7 +47,7 @@ if __name__ == "__main__":
             routing_key=model_id,
             body=payload,
         )
-        time.sleep(1)
+        time.sleep(2)
         
         return end_ix
 

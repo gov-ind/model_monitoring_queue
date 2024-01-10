@@ -3,15 +3,27 @@ version: '3.7'
 services:
   rabbit:
     image: "rabbitmq:3"
-  inference_server_1:
+  inference_server_0_client_0:
     image: inference_server
     build:
       context: .
-    command: ["python", "inference_server.py", "model_0"]
-  metrics_server_1:
+    command: ["python", "inference_server.py", "model_0", "client_0"]
+  metrics_server_0:
     image: metrics_server
     build:
       context: .
     deploy:
       replicas: 1
     command: ["python", "metrics_server.py", "model_0"]
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+  grafana:
+    image: grafana/grafana-enterprise
+    ports:
+      - "13000:3000"
+    volumes:
+      - ./datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
