@@ -1,0 +1,17 @@
+version: '3.7'
+
+services:
+  rabbit:
+    image: "rabbitmq:3"
+  inference_server_1:
+    image: inference_server
+    build:
+      context: .
+    command: ["python", "inference_server.py", "model_0"]
+  metrics_server_1:
+    image: metrics_server
+    build:
+      context: .
+    deploy:
+      replicas: 1
+    command: ["python", "metrics_server.py", "model_0"]

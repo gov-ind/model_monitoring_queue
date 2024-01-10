@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'metrics_server_1'
+    scrape_interval: 1s
+    dns_sd_configs:
+      - names:
+          - metrics_server_1
+        type: A
+        port: 8000
