@@ -1,11 +1,26 @@
 from io import StringIO
 from json import loads
 import logging
+import threading
 import time
 
 import pandas as pd
+from prometheus_client import Gauge, start_http_server
 
 from common import batch_size, exchange_name, parse_args, wait_for_broker
+
+metrics = {}
+
+
+def register_metric(metric_name, value, metric_description=None):
+    if metric_description is None:
+        metric_description = metric_name
+    if metric_name not in metrics:
+        metrics[metric_name] = Gauge(
+            metric_name,
+            metric_description,
+        )
+    metrics[metric_name].set(value)
 
 
 def callback(ch, method, properties, body):
@@ -16,12 +31,16 @@ def callback(ch, method, properties, body):
                  f"batch: {data.index[0] // batch_size}, "
                  f"time: {data.iloc[0].time}")
 
+    register_metric("mean_feature_0", data.feature_0.mean(), "Mean of feature_0")
+
     time.sleep(6)
     ch.basic_ack(delivery_tag=method.delivery_tag)
 
 
 if __name__ == "__main__":
     model_id, _ = parse_args()
+
+    threading.Thread(target=lambda: start_http_server(8000)).start()
 
     connection = wait_for_broker()
     channel = connection.channel()
