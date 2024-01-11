@@ -2,19 +2,31 @@ version: '3.7'
 
 services:
   rabbit:
-    image: "rabbitmq:3"
-  inference_server_0_client_0:
+    image: rabbitmq:3
+  inference_server_0:
     image: inference_server
     build:
       context: .
-    command: ["python", "inference_server.py", "model_0", "client_0"]
+    command: ["python", "inference_server.py", "model_0"]
+  inference_server_1:
+    image: inference_server
+    build:
+      context: .
+    command: ["python", "inference_server.py", "model_1", "gradual"]
   metrics_server_0:
     image: metrics_server
     build:
       context: .
     deploy:
-      replicas: 1
+      replicas: 4
     command: ["python", "metrics_server.py", "model_0"]
+  metrics_server_1:
+    image: metrics_server
+    build:
+      context: .
+    deploy:
+      replicas: 2
+    command: ["python", "metrics_server.py", "model_1"]
   prometheus:
     image: prom/prometheus
     ports:

@@ -1,6 +1,5 @@
 from datetime import datetime
 import logging
-import random
 import sys
 import time
 from json import dumps
@@ -8,53 +7,77 @@ from json import dumps
 import numpy as np
 import pandas as pd
 
-from common import batch_size, exchange_name, wait_for_broker
+from common import batch_size, exchange_name, parse_args, wait_for_broker
 
-if __name__ == "__main__":
-    connection = wait_for_broker()
-    channel = connection.channel()
-    channel.exchange_declare(exchange=exchange_name, exchange_type="direct")
 
-    n_args = len(sys.argv)
-    assert n_args > 1, "A model ID must be passed."
-    model_id = sys.argv[1]
-    if n_args > 2:
-        client_id = sys.argv[2]
-    else:
-        logging.info("No client ID was passed. Assuming that the model ID is the client ID.")
-        client_id = model_id
- 
-    def make_inferences(start_ix):
-        end_ix = start_ix + batch_size
-        data = np.ones(batch_size) + np.random.normal(0, 1, batch_size)
-        
-        if random.randint(0, 10) == 0:
-            data += 5
-        
-        data = pd.DataFrame({
-            "feature_1": data,
+class Drifter:
+    def __init__(self, drift_type="constant"):
+        self.drift_type = drift_type
+        self.last_drift_time = time.time()
+        self.drift_interval_start, self.drift_interval_end = 60, 120
+        self.drift_interval_mid = (
+            self.drift_interval_end + self.drift_interval_start
+        ) / 2
+
+    def add_noise(self, data):
+        self.time_since_last_drift = time.time() - self.last_drift_time
+        if self.time_since_last_drift > self.drift_interval_start:
+            # Time to drift
+            logging.info("Drifting")
+            if drift_type == "constant":
+                data += 5
+            else:
+                noise = self.drift_interval_mid - abs(
+                    self.drift_interval_mid - self.time_since_last_drift
+                )
+                noise -= self.drift_interval_start
+                data += noise
+            if self.time_since_last_drift > self.drift_interval_end:
+                self.last_drift_time = time.time()
+        return data
+
+
+class MLServer:
+    def __init__(self, model_id, drifter):
+        self.connection = wait_for_broker()
+        self.channel = self.connection.channel()
+        self.channel.exchange_declare(exchange=exchange_name, exchange_type="direct")
+
+        self.start_ix = 0
+        self.model_id = model_id
+        self.drifter = drifter
+
+    def simulate_post(self):
+        data = np.random.normal(1, 1, batch_size)
+        self.drifter.add_noise(data)
+
+        df = pd.DataFrame({
+            "feature_0": data,
             "pred": data > 1,
             "time": datetime.now()
-        }, index=range(start_ix, end_ix))
+        }, index=range(self.start_ix, self.start_ix + batch_size))
         payload = dumps({
-            "model_id": model_id,
-            "client_id": client_id,
-            "data": data.to_json(date_format="iso")
+            "model_id": self.model_id,
+            "data": df.to_json(date_format="iso")
         })
-
-        channel.basic_publish(
+        self.channel.basic_publish(
             exchange=exchange_name,
-            routing_key=model_id,
+            routing_key=self.model_id,
             body=payload,
         )
-        time.sleep(2)
-        
-        return end_ix
+        logging.info(f"Sent batch {self.start_ix // batch_size} to queue.")
+        self.start_ix += batch_size
 
-    ix = 0
-    try:
-        while True:
-            logging.info(f"Making inference for batch {ix // batch_size}")
-            ix = make_inferences(ix)
-    except:
-        connection.close()
+        time.sleep(2)
+
+
+if __name__ == "__main__":
+    model_id, drift_type = parse_args()
+
+    server = MLServer(
+        model_id,
+        drifter=Drifter(drift_type)
+    )
+
+    while True:
+        server.simulate_post()
