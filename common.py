@@ -9,12 +9,12 @@ batch_size = 100
 logging.basicConfig(level=logging.INFO)
 
 
-def parse_args():
+def parse_args(n=2, default_args=["common"]):
     args = sys.argv[1:]
     n_args = len(args)
     assert n_args > 0, "A model ID must be passed."
-    if n_args != 2:
-        args.append("constant")
+    if n_args != n:
+        args += default_args
     return args
 
 

@@ -8,6 +8,8 @@ services:
     build:
       context: .
     command: ["python", "inference_server.py", "model_0"]
+    volumes:
+      - ./metrics_server_replay.py:/metrics_server_replay.py
   inference_server_1:
     image: inference_server
     build:

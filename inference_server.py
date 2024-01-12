@@ -41,6 +41,20 @@ class MLServer:
         self.connection = wait_for_broker()
         self.channel = self.connection.channel()
         self.channel.exchange_declare(exchange=exchange_name, exchange_type="direct")
+        self.channel.queue_declare(
+            queue=model_id + "_stream",
+            durable=True,
+            exclusive=False,
+            auto_delete=False,
+            arguments={
+                "x-queue-type": "stream"
+            }
+        )
+        self.channel.queue_bind(
+            exchange=exchange_name,
+            queue=model_id + "_stream",
+            routing_key=model_id
+        )
 
         self.start_ix = 0
         self.model_id = model_id
